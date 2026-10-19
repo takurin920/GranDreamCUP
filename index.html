@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>GraDre杯</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    /* 注意：html/body に overflow を指定すると position: sticky が効かなくなるため指定しない */
+    body, html {
+      width: 100%;
+      font-family: 'Helvetica Neue', Arial, sans-serif;
+      background-color: #0b1d3a;
+      color: #ffffff;
+    }
+    
+
+    /* ヒーローを固定したまま雲を上げるためのスクロール領域（高さ＝ヒーロー＋雲が上がり切るまでの距離） */
+    :root { --pin: 80vh; } /* 雲が上がり切るまでのスクロール距離。小さいほど早く次へ進む */
+    .hero-scroll {
+      position: relative;
+      height: calc(100vh + var(--pin));
+      height: calc(100svh + var(--pin));
+    }
+
+    /* --- 背景グラデーション --- */
+    .hero-section {
+      position: sticky;   /* スクロール中も画面に固定 */
+      top: 0;
+      width: 100%;
+      height: 100vh;
+      height: 100svh; /* スマホのアドレスバーを除いた高さ */
+      background: linear-gradient(180deg, #0d2042 0%, #122b56 40%, #17386c 75%, #1e4782 100%);
+      overflow: hidden;
+    }
+
+    /* 星空レイヤー（視差用） */
+    .sky-layer {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      will-change: transform;
+    }
+
+    /* 星の瞬き：基本の明るさは --o、周期と遅延は星ごとにJSで指定 */
+    .star.twinkle {
+      animation: twinkle var(--d, 3s) ease-in-out var(--delay, 0s) infinite;
+    }
+    @keyframes twinkle {
+      0%, 100% { opacity: var(--o); }
+      50%      { opacity: calc(var(--o) * 0.2); }
+    }
+
+    /* 流れ星 */
+    .shooting-star {
+      position: absolute;
+      width: 140px;
+      height: 2px;
+      border-radius: 2px;
+      background: linear-gradient(90deg, rgba(255,246,76,0), #ffffff);
+      filter: drop-shadow(0 0 4px rgba(186, 230, 253, 0.9));
+      opacity: 0;
+      pointer-events: none;
+      animation: shoot 1.1s ease-out forwards;
+    }
+    @keyframes shoot {
+      0%   { opacity: 0; transform: rotate(var(--angle)) translateX(0); }
+      15%  { opacity: 1; }
+      100% { opacity: 0; transform: rotate(var(--angle)) translateX(var(--dist)); }
+    }
+
+    /* 中央タイトルテキスト */
+    .hero-content {
+      position: absolute;
+      top: 38%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 5;
+      text-align: center;
+      text-shadow: 0 4px 20px rgba(8, 20, 42, 0.7);
+      will-change: transform, opacity;
+      width: 90%;
+      max-width: 800px;
+    }
+    .hero-content h1 {
+      font-size: clamp(2.2rem, 10vw, 3.5rem);
+      font-weight: 300;
+      letter-spacing: clamp(2px, 1.2vw, 6px);
+      margin-bottom: 1rem;
+      color: #ffffff;
+    }
+    .hero-content p {
+      font-size: clamp(0.95rem, 3.6vw, 1.15rem);
+      opacity: 0.9;
+      letter-spacing: clamp(1px, 0.5vw, 2px);
+      color: #e0f2fe;
+    }
+
+    /* 雲レイヤー（奥・手前で別コンテナ＝別速度で視差） */
+    .cloud-layer {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      pointer-events: none;
+      will-change: transform;
+    }
+    .cloud-layer.back  { bottom: 6vh;  height: 50vh; z-index: 8; }
+    .cloud-layer.front { bottom: -2px; height: 46vh; z-index: 10; }
+
+    /* 手前の雲の下に継ぎ足す下地：雲と一緒に上がり、開催概要を載せる。色は .next-section と同じ */
+    .cloud-body {
+      position: absolute;
+      left: 0;
+      right: 0;
+      top: calc(100% - 1px);
+      height: 150vh;
+      padding: clamp(20px, 5vh, 48px) 20px 0;
+      /* 上端は雲の白（#f8fafc）からなじませて継ぎ目を消し、以降は --bg（スクロールで変化） */
+      background: linear-gradient(180deg, #f8fafc 0, var(--bg, #f8fafc) 80px);
+      color: #1e293b;
+      pointer-events: auto;
+    }
+    .overview { max-width: 560px; margin: 0 auto; }
+    .overview h2 {
+      font-size: clamp(1.3rem, 5vw, 1.7rem);
+      font-weight: 400;
+      letter-spacing: 0.2em;
+      text-align: center;
+      margin-bottom: clamp(14px, 3vh, 28px);
+    }
+    .overview dl { display: grid; grid-template-columns: 5.5em 1fr; }
+    .overview dt, .overview dd {
+      padding: clamp(10px, 1.8vh, 16px) 0;
+      border-bottom: 1px solid #dbe4ef;
+      font-size: clamp(0.9rem, 3.8vw, 1.05rem);
+      line-height: 1.6;
+    }
+    .overview dt { color: #1d4ed8; font-weight: 600; }
+    .overview dd { color: #334155; }
+    .overview h2, .overview dt, .overview dd { transition: color 0.4s, border-color 0.4s; }
+
+    /* 背景が暗くなったら文字を明るく切り替える */
+    .cloud-body.dark, .maps.dark { color: #fff7ee; }
+    .cloud-body.dark .overview dt { color: #ffe2a8; }
+    .cloud-body.dark .overview dd { color: #fff7ee; }
+    .cloud-body.dark .overview dt,
+    .cloud-body.dark .overview dd { border-bottom-color: rgba(255, 255, 255, 0.35); }
+
+    /* 横ドリフト用ラッパー：左右にはみ出させて動かしても端が見えないようにする */
+    .cloud-drift {
+      position: absolute;
+      top: 0;
+      left: -6%;
+      width: 112%;
+      height: 100%;
+      animation: drift var(--drift, 24s) ease-in-out infinite alternate;
+    }
+    .cloud-drift.back  { --drift: 32s; opacity: 0.95; }
+    .cloud-drift.front { --drift: 22s; animation-direction: alternate-reverse; }
+    @keyframes drift {
+      from { transform: translateX(-2.5%); }
+      to   { transform: translateX(2.5%); }
+    }
+
+    .clouds-svg { width: 100%; height: 100%; display: block; }
+
+    /* 次のコンテンツセクション */
+    .next-section {
+      position: relative;
+      margin-top: -1px;
+      z-index: 15;
+      background: var(--bg, #f8fafc); /* 開催概要と同じ色にスクロールで連動 */
+      color: #1e293b;
+      transition: color 0.4s;
+    }
+
+    /* ===== タイムテーブル：左に固定し、スクロールで項目を1つずつ選択。右に内容を表示 ===== */
+    .tt-scroll {
+      --tt-step: 60vh;   /* 1項目あたりのスクロール距離 */
+      --tt-count: 4;     /* 項目数 */
+      position: relative;
+      height: calc(100vh + var(--tt-step) * var(--tt-count));
+      height: calc(100svh + var(--tt-step) * var(--tt-count));
+    }
+    .tt-stage {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      height: 100svh;
+      display: grid;
+      grid-template-columns: clamp(150px, 26vw, 300px) minmax(0, 1fr);
+      gap: clamp(16px, 5vw, 64px);
+      align-items: center;
+      padding: 0 24px 0 clamp(24px, 8vw, 160px);
+    }
+
+    /* 左：項目リスト */
+    .timetable h2 {
+      font-size: 18px;
+      letter-spacing: 0.1em;
+      color: #334155;
+      border-bottom: 2px solid #e2e8f0;
+      padding-bottom: 8px;
+      margin-bottom: 20px;
+      transition: color 0.4s, border-color 0.4s;
+    }
+    .tt-list {
+      --track: #cbd5e1;  /* 線（未到達） */
+      --accent: #818cf8; /* 線（到達済み）・点 */
+      --fill: 0;         /* 0〜1：JSが選択中の項目まで伸ばす */
+      position: relative;
+      list-style: none;
+      padding-left: 24px;
+      display: flex;
+      flex-direction: column;
+      gap: 24px;
+    }
+    .tt-list::before, .tt-list::after { content: ''; position: absolute; left: 0; top: 0; width: 2px; }
+    .tt-list::before { bottom: 0; background: var(--track); transition: background 0.4s; }
+    .tt-list::after  { height: calc(var(--fill) * 100%); background: var(--accent); transition: height 0.5s ease, background 0.4s; }
+
+    .tt-item { position: relative; cursor: pointer; }
+    .tt-dot {
+      position: absolute;
+      left: -27px; top: 4px;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #94a3b8;
+      transition: background 0.4s, transform 0.4s;
+    }
+    .tt-label { font-size: 12px; color: #5b6b82; transition: color 0.4s; }
+    .tt-time  { margin-top: 2px; font-size: 18px; font-weight: bold; color: #5b6b82; transition: color 0.4s; }
+    .tt-main .tt-dot   { left: -29px; top: 2px; width: 12px; height: 12px; }
+    .tt-main .tt-label { font-weight: bold; }
+    .tt-main .tt-time  { font-size: 20px; }
+
+    .tt-item.past .tt-dot { background: #818cf8; }            /* 通過済み：点だけ青 */
+    .tt-item.active .tt-dot   { background: #818cf8; transform: scale(1.35); }
+    .tt-item.active .tt-label { color: #6366f1; }
+    .tt-item.active .tt-time  { color: #1e293b; }
+
+    /* 右：選択中の項目の内容（すべて同じ位置に重ねて、切り替えでフェード） */
+    .tt-panels { display: grid; max-width: 920px; }
+    .tt-panel {
+      grid-area: 1 / 1;
+      opacity: 0;
+      transform: translateY(14px);
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .tt-panel.active { opacity: 1; transform: none; pointer-events: auto; }
+    .tt-img {
+      aspect-ratio: 16 / 9;
+      /* 横は右の列いっぱいまで。ただし画面の高さの52%を超えない大きさに抑え、文章が画面から切れないようにする */
+      width: min(100%, calc(52vh * 16 / 9));
+      width: min(100%, calc(52svh * 16 / 9));
+      border-radius: 14px;
+      overflow: hidden;
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #bae6fd, #e0f2fe);
+      color: #64748b;
+      font-size: 0.85rem;
+      letter-spacing: 0.1em;
+      transition: background 0.4s;
+    }
+    .tt-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .tt-ptime { margin-top: 16px; font-size: 0.85rem; font-weight: bold; letter-spacing: 0.1em; color: #6366f1; }
+    .tt-panel h3 { margin-top: 2px; font-size: clamp(1.2rem, 4vw, 1.6rem); font-weight: 600; color: #1e293b; }
+    .tt-panel p.tt-text { margin-top: 8px; font-size: clamp(0.88rem, 3.4vw, 1rem); line-height: 1.8; color: #475569; }
+    .tt-ptime, .tt-panel h3, .tt-panel p.tt-text { transition: color 0.4s; }
+
+    /* 背景が暗くなったとき */
+    .maps.dark .timetable h2 { color: #fff7ee; border-bottom-color: rgba(255, 255, 255, 0.35); }
+    .maps.dark .tt-list { --track: rgba(255, 255, 255, 0.35); --accent: #ffe2a8; }
+    .maps.dark .tt-dot { background: #e6bd98; }
+    .maps.dark .tt-label, .maps.dark .tt-time { color: #f0d3b8; }
+    .maps.dark .tt-item.past .tt-dot { background: #ffe2a8; }
+    .maps.dark .tt-item.active .tt-dot   { background: #ffe2a8; }
+    .maps.dark .tt-item.active .tt-label { color: #ffe2a8; }
+    .maps.dark .tt-item.active .tt-time  { color: #fff7ee; }
+    .maps.dark .tt-img { background: linear-gradient(135deg, #7f8fd0, #3f4f94); color: #f5dcc6; }
+    .maps.dark .tt-ptime { color: #ffe2a8; }
+    .maps.dark .tt-panel h3 { color: #fff7ee; }
+    .maps.dark .tt-panel p.tt-text { color: #fbeadb; }
+
+    /* ===== 使用マップ：左に見出し、右に3×3の画像グリッド ===== */
+    .maps {
+      padding: clamp(72px, 12vh, 120px) 24px clamp(80px, 14vh, 140px) clamp(24px, 8vw, 160px);
+    }
+    .maps-inner {
+      display: grid;
+      grid-template-columns: clamp(150px, 26vw, 300px) minmax(0, 1fr); /* タイムテーブルと同じ列幅 */
+      gap: clamp(16px, 5vw, 64px);
+      align-items: start;
+    }
+    .maps-head { position: sticky; top: 14vh; } /* グリッドをスクロールする間、見出しは左に残る */
+    .map-grid {
+      list-style: none;
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: clamp(10px, 2vw, 20px);
+      max-width: 920px;
+    }
+    .map-img {
+      aspect-ratio: 16 / 9;
+      overflow: hidden;
+      position: relative;
+      /* 宇宙・近未来風：シャープな角、細い氷色の枠、二重線、内側の陰影 */
+      border-radius: 3px;
+      border: 1px solid rgba(190, 215, 255, 0.65);
+      box-shadow: 0 0 0 4px rgba(190, 215, 255, 0.12); /* 外側の二重線 */
+      display: grid;
+      place-items: center;
+      background: linear-gradient(135deg, #bae6fd, #e0f2fe);
+      color: #64748b;
+      font-size: 0.75rem;
+      letter-spacing: 0.1em;
+      transition: background 0.4s, box-shadow 0.3s, transform 0.3s;
+    }
+    /* 画像の縁を少し暗くして、奥行きを出す（画像の上に重ねる） */
+    .map-img::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      box-shadow: inset 0 0 28px rgba(8, 16, 48, 0.45);
+    }
+    /* .map-grid li:hover .map-img {
+      transform: translateY(-3px);
+      box-shadow: 0 0 0 4px #ffffff, 0 0 0 5px rgba(129, 140, 248, 0.9), 0 16px 28px rgba(60, 70, 120, 0.32);
+    }*/
+    .map-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .map-name {
+      margin-top: 8px;
+      font-size: clamp(0.78rem, 2.6vw, 0.95rem);
+      font-weight: 600;
+      color: #334155;
+      transition: color 0.4s;
+    }
+    .map-name span { margin-right: 0.5em; color: #3730a3; font-weight: bold; transition: color 0.4s; }
+
+    .maps.dark .map-img {
+      background: linear-gradient(135deg, #7f8fd0, #3f4f94);
+      color: #f5dcc6;
+    }
+    /*.maps.dark .map-grid li:hover .map-img {
+      box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16), 0 0 0 5px rgba(255, 226, 168, 0.7), 0 16px 30px rgba(0, 0, 0, 0.5);
+    }*/
+    .maps.dark .map-name { color: #fff7ee; }
+    .maps.dark .map-name span { color: #ffe2a8; }
+
+    /* ===== 主催代表コメント：左にコメント文、右に画像 ===== */
+    .comment {
+      padding: clamp(72px, 12vh, 120px) 24px clamp(48px, 10vh, 100px);
+    }
+    .comment-inner {
+      margin: 0 auto; /* 中央寄せ */
+      display: grid;
+      grid-template-columns: clamp(200px, 26vw, 280px) minmax(0, 1fr); /* 左：アイコンの幅ぴったり／右：コメント */
+      gap: clamp(16px, 3vw, 32px);
+      align-items: center;
+      max-width: 1100px;
+    }
+    .cm-body { font-size: clamp(0.92rem, 3.4vw, 1.05rem); line-height: 2; color: #475569; transition: color 0.4s; }
+    .cm-body + .cm-body { margin-top: 1em; }
+    .cm-name { margin-top: 20px; font-weight: 600; color: #1e293b; text-align: left; transition: color 0.4s; }
+    .cm-name small { display: block; font-size: 0.75rem; letter-spacing: 0.1em; color: #6366f1; transition: color 0.4s; }
+    /* アイコンのフレーム：グラデーションのリング＋外側のゆっくり回る点線リング＋きらめき */
+    .cm-icon {
+      position: relative;
+      width: min(100%, 280px);
+      aspect-ratio: 1;
+      margin: 18px auto;
+      padding: 8px; /* リングの太さ */
+      border-radius: 50%;
+      background: linear-gradient(135deg, #a5c8ff, #f9b4d4);
+      box-shadow: 0 10px 28px rgba(15, 36, 71, 0.28);
+      transition: box-shadow 0.4s;
+    }
+    .cm-icon::before { /* 外側の点線リング */
+      content: '';
+      position: absolute;
+      inset: -14px;
+      border-radius: 50%;
+      border: 2px dashed rgba(165, 180, 252, 0.75);
+      animation: cm-spin 40s linear infinite;
+    }
+    .cm-icon::after { /* きらめき */
+      content: '✦';
+      position: absolute;
+      top: 4%;
+      right: 6%;
+      font-size: 1.5rem;
+      line-height: 1;
+      color: #f9a8d4;
+      text-shadow: 0 0 10px rgba(249, 168, 212, 0.7);
+    }
+    .cm-icon { order: -1; 
+      width: min(70%, 220px);
+    }
+
+    @keyframes cm-spin { to { transform: rotate(360deg); } }
+    .cm-icon-frame {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      overflow: hidden;
+      border: 5px solid var(--bg, #f8fafc); /* リングとの間に、背景色の細い隙間を作る */
+      background: linear-gradient(135deg, #bae6fd, #e0f2fe);
+      display: grid;
+      place-items: center;
+      color: #64748b;
+      font-size: 0.8rem;
+      letter-spacing: 0.1em;
+      transition: background 0.4s;
+    }
+    .cm-icon-frame img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    @media (prefers-reduced-motion: reduce) { .cm-icon::before { animation: none; } }
+
+    .maps.dark .cm-body { color: #fbeadb; }
+    .maps.dark .cm-name { color: #fff7ee; }
+    .maps.dark .cm-name small { color: #ffe2a8; }
+    .maps.dark .cm-icon { box-shadow: 0 10px 28px rgba(0, 0, 0, 0.5); }
+    .maps.dark .cm-icon::before { border-color: rgba(255, 226, 168, 0.55); }
+    .maps.dark .cm-icon-frame { background: linear-gradient(135deg, #7f8fd0, #3f4f94); color: #f5dcc6; }
+    /* ===== 夜空：最初のタイトル部分と同じ夜空が、決勝戦あたりから見え始める。画面に固定され、スクロールしても動かない ===== */
+    .night {
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      height: 100svh;
+      margin-bottom: -100vh;  /* 高さを取らず、背景として重ねる */
+      margin-bottom: -100svh;
+      z-index: 0;
+      pointer-events: none;
+      opacity: var(--stars, 0);
+      background: linear-gradient(180deg, #0d2042 0%, #122b56 40%, #17386c 75%, #1e4782 100%); /* ヒーローと同じ */
+    }
+    .comment, .tt-scroll, .maps { position: relative; z-index: 1; } /* 内容はドットより手前 */
+    
+
+    /* 開催概要の下：ルールブックへのリンク（Notion） */
+    .ov-link { margin-top: clamp(12px, 2.5vh, 22px); text-align: center; }
+    .ov-link a {
+      color: #64748b;                 /* グレー */
+      font-size: clamp(0.8rem, 3.2vw, 0.9rem);
+      letter-spacing: 0.06em;
+      text-decoration: underline;     /* アンダーバー */
+      text-underline-offset: 4px;
+      transition: color 0.3s;
+    }
+    .ov-link a:hover { color: #334155; }
+
+    /* ===== 画面右下に固定する、3段に重ねた雲のリンク（主催代表あいさつ以降〜最後まで／開催概要から表示） ===== */
+    .cloud-stack {
+      position: fixed;
+      right: clamp(12px, 2vw, 28px);
+      bottom: calc(clamp(12px, 2vw, 28px) + env(safe-area-inset-bottom, 0px));
+      z-index: 50;
+      width: clamp(130px, 18vw, 190px);
+      display: flex;
+      flex-direction: column;
+      opacity: 0;
+      transform: translateY(16px);
+      pointer-events: none;
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .cloud-stack.show { opacity: 1; transform: none; pointer-events: auto; }
+    .entry-cloud {
+      --dx: 0px; /* 左右のずらし */
+      position: relative;
+      display: block;
+      width: 100%;
+      color: #1d4ed8;
+      text-decoration: none;
+      filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.25));
+      transform: translateX(var(--dx));
+      transition: transform 0.3s ease;
+    }
+    .entry-cloud + .entry-cloud { margin-top: -6%; }   /* 雲同士の重なり。0以上の数字（例：2%）にすると、重ならず間が空く */
+    .entry-cloud:nth-child(1) { --dx: -8px; }          /* 1段目（上）：対戦表 */
+    .entry-cloud:nth-child(2) { --dx: 6px; }            /* 2段目：参加チーム */
+    .entry-cloud:hover { transform: translate(var(--dx), -3px); }
+    .entry-cloud svg { display: block; width: 100%; height: auto; }
+    .entry-cloud span {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      align-content: center;   /* 文字と矢印を、くっつけて中央に */
+      justify-items: center;
+      padding-top: 12%;
+      font-size: clamp(0.8rem, 2.6vw, 0.95rem);
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      white-space: nowrap;
+    }
+
+    /* ===== 右上のナビ：スクロールについてこない（ページの先頭に置く） ===== */
+    .top-nav {
+      position: absolute;
+      top: clamp(14px, 3vh, 28px);
+      right: clamp(16px, 3vw, 40px);
+      z-index: 60;
+      display: flex;
+      gap: clamp(16px, 3vw, 32px);
+    }
+    .top-nav a {
+      color: #ffffff;
+      font-size: clamp(0.8rem, 3vw, 0.95rem);
+      letter-spacing: 0.18em;
+      text-decoration: none;
+      padding-bottom: 4px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.45);
+      text-shadow: 0 1px 8px rgba(8, 20, 42, 0.6);
+      transition: border-color 0.3s;
+    }
+    .top-nav a:hover { border-bottom-color: #ffffff; }
+
+    /* ===== フッター：左にロゴと紹介、右にリンクの列、最下部に権利表記 ===== */
+    .site-footer {
+      position: relative;
+      z-index: 15;
+      background: #0d1b36;
+      color: #e8ecf6;
+      padding: clamp(40px, 8vh, 72px) clamp(24px, 8vw, 160px) calc(24px + env(safe-area-inset-bottom, 0px));
+    }
+    .ft-inner {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: clamp(32px, 6vw, 80px);
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .ft-brand { flex: 1 1 260px; max-width: 360px; }
+    .ft-brand img { display: block; height: clamp(64px, 10vw, 96px); width: auto; } /* ロゴの大きさ */
+    .ft-about { margin-top: 16px; font-size: 0.82rem; line-height: 1.8; color: #aab3c8; }
+    .ft-cols { display: flex; flex-wrap: wrap; gap: clamp(32px, 6vw, 72px); }
+    .ft-col h3 { margin-bottom: 14px; font-size: 1rem; font-weight: 700; letter-spacing: 0.04em; color: #ffffff; }
+    .ft-col ul { list-style: none; }
+    .ft-col li + li { margin-top: 12px; }
+    .ft-col a { font-size: 0.8rem; color: #aab3c8; text-decoration: none; transition: color 0.3s; }
+    .ft-col a:hover { color: #ffffff; }
+    .ft-x {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+      font-size: 0.8rem;
+      color: #aab3c8;
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+    .ft-x svg { width: 18px; height: 18px; fill: currentColor; }  /* Xのロゴ */
+    .ft-x:hover { color: #ffffff; }
+    .ft-members { columns: 2; column-gap: 28px; }  /* 運営メンバーを2列に */
+    .ft-members li { break-inside: avoid; }
+    .ft-bottom {
+      max-width: 1200px;
+      margin: clamp(28px, 6vh, 48px) auto 0;
+      padding-top: 20px;
+      border-top: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.72rem;
+      line-height: 1.8;
+      color: #8791a8;
+    }
+    .ft-bottom p + p { margin-top: 8px; }
+
+    /* ===== 画像をクリックで拡大表示（ライトボックス）：TIME TABLE・MAPS・説明の画像が対象 ===== */
+    .tt-img img, .map-img img { cursor: zoom-in; }
+    .lightbox {
+      position: fixed;
+      inset: 0;
+      z-index: 100;               /* 右上ナビ・右下の雲より手前 */
+      display: grid;
+      place-items: center;
+      padding: 4vh 4vw;
+      background: rgba(5, 10, 30, 0.88);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.3s ease;
+      cursor: zoom-out;
+    }
+    .lightbox.open { opacity: 1; pointer-events: auto; }
+    .lightbox img {
+      max-width: 92vw;
+      max-height: 88vh;
+      object-fit: contain;
+      border-radius: 4px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+      transform: scale(0.96);
+      transition: transform 0.3s ease;
+    }
+    .lightbox.open img { transform: none; }
+    .lightbox button {
+      position: absolute;
+      top: clamp(12px, 3vh, 24px);
+      right: clamp(12px, 3vw, 28px);
+      background: none;
+      border: 0;
+      color: #ffffff;
+      font-size: 1.8rem;
+      line-height: 1;
+      cursor: pointer;
+    }
+
+    /* スマホ・狭い画面 */
+    @media (max-width: 640px) {
+      .hero-content { top: 34%; }
+      .cloud-layer.back  { bottom: 4vh;  height: 34vh; }
+      .cloud-layer.front { height: 30vh; }
+      .shooting-star { width: 90px; }
+      .tt-stage { grid-template-columns: 118px minmax(0, 1fr); gap: 14px; padding: 0 16px 0 20px; }
+      .timetable h2 { font-size: 14px; }
+      .tt-time { font-size: 16px; }
+      .tt-main .tt-time { font-size: 17px; }
+      .tt-list { gap: 20px; }
+      .comment { padding: 64px 20px 40px; }
+      .comment-inner { grid-template-columns: 1fr; gap: 20px; } /* スマホはコメント文の下に画像 */
+      .cm-icon { width: min(70%, 220px); }
+      .maps { padding: 64px 16px 80px 20px; }
+      .maps-inner { grid-template-columns: 1fr; gap: 18px; } /* スマホは見出しを上、グリッドを全幅に */
+      .maps-head { position: static; }
+      .map-grid { gap: 8px; }
+      .map-name { font-size: 0.72rem; margin-top: 6px; }
+      /* スマホ：画像の比率は変えない */
+      .tt-img { width: min(100%, calc(44svh * 16 / 9)); } /* 比率は16:9のまま（PCと同じ）。高さだけ画面に収まるよう抑える */
+    }
+
+    /* 動きを減らす設定の人にはアニメーションを止める */
+    @media (prefers-reduced-motion: reduce) {
+      .star.twinkle, .cloud-drift { animation: none; }
+      .shooting-star { display: none; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- 右上のナビ（スクロールについてこない）。href を実際のページに差し替える -->
+  <nav class="top-nav" aria-label="ページ移動">
+    <a href="teams.html">参加チーム</a>
+    <a href="bracket.html">対戦表</a>
+  </nav>
+
+  <div class="hero-scroll" id="heroScroll">
+  <section class="hero-section" id="hero">
+
+    <!-- 星空背景 -->
+    <div class="sky-layer" id="skyLayer">
+      <svg id="starSvg" style="width:100%; height:100%;"></svg>
+      <div id="shootingLayer"></div>
+    </div>
+
+    <!-- タイトル表示 -->
+    <div class="hero-content" id="heroContent">
+      <h1 style="margin-top: -150px; margin-bottom: -20px;"><img src="images/GranDreamCUP.png" alt="GranDreamCUP" style="width: 100%; max-width: none; height: auto; display: block; margin: 0 auto;"></h1>
+      <p style="margin-top: 30px;">GranDream presents</p>
+      <p>- 2026.11.28 sat -</p>
+    </div>
+
+    <!-- 奥の雲：水色ベース（ゆっくり・遠くに見える） -->
+    <div class="cloud-layer back" id="cloudBack">
+      <div class="cloud-drift back">
+        <svg class="clouds-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 300" preserveAspectRatio="none">
+          <defs>
+            <filter id="cloud-glow-back" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="12" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <linearGradient id="cloud-grad-back" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#bae6fd" stop-opacity="0.9" />
+              <stop offset="100%" stop-color="#f8fafc" stop-opacity="1" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#cloud-grad-back)" filter="url(#cloud-glow-back)" d="
+            M -50,300
+            L -50,80
+            A 60,60 0 0,1 50,60
+            A 80,80 0 0,1 180,80
+            A 70,70 0 0,1 290,130
+            A 60,60 0 0,1 390,170
+            A 75,75 0 0,1 520,180
+            A 65,65 0 0,1 630,160
+            A 70,70 0 0,1 740,110
+            A 85,85 0 0,1 880,50
+            A 65,65 0 0,1 980,60
+            A 55,55 0 0,1 1050,100
+            L 1050,300 Z
+          "></path>
+        </svg>
+      </div>
+    </div>
+
+    <!-- 手前の雲：真っ白（速く動き、近くに見える） -->
+    <div class="cloud-layer front" id="cloudFront">
+      <div class="cloud-drift front">
+        <svg class="clouds-svg" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 300" preserveAspectRatio="none">
+          <defs>
+            <filter id="cloud-glow-front" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="12" result="blur" />
+              <feComposite in="SourceGraphic" in2="blur" operator="over" />
+            </filter>
+            <linearGradient id="cloud-grad-front" x1="0%" y1="0%" x2="0%" y2="100%">
+              <stop offset="0%" stop-color="#ffffff" stop-opacity="1" />
+              <stop offset="100%" stop-color="#f8fafc" stop-opacity="1" />
+            </linearGradient>
+          </defs>
+          <path fill="url(#cloud-grad-front)" filter="url(#cloud-glow-front)" d="
+            M -50,300
+            L -50,110
+            A 65,65 0 0,1 60,75
+            A 75,75 0 0,1 190,105
+            A 60,60 0 0,1 280,150
+            A 70,70 0 0,1 400,195
+            A 80,80 0 0,1 540,205
+            A 65,65 0 0,1 650,180
+            A 75,75 0 0,1 770,120
+            A 90,90 0 0,1 920,65
+            A 60,60 0 0,1 1050,90
+            L 1050,300 Z
+          "></path>
+        </svg>
+      </div>
+      <div class="cloud-body">
+        <div class="overview">
+          <h2>開催概要</h2>
+          <dl>
+            <dt>タイトル</dt><dd>スプラトゥーン3</dd>
+            <dt>日時</dt><dd>2026年11月28日（土）</dd>
+            <dt>時間</dt><dd>開場 19:00 ／ 試合開始 19:30</dd>
+            <dt>チーム数</dt><dd>16チーム想定</dd>
+            <dt>XPコスト</dt><dd>チーム合計10400上限
+              <br>･XP3000以上は１名まで
+              <br>･全ルールでの最高XPを参照(サマリー提出)<br/></dd>
+              <dt>参加資格</dt><dd>活動中の配信者に限り</dd>
+            <dt></dt><dd></dd>
+            <dt>主催</dt><dd>GranDream</dd>
+            <dt>申込</dt><dd>11月7日まで（申込フォーム準備中）</dd>
+          </dl>
+          <p class="ov-link"><a href="https://energetic-octagon-8f6.notion.site/3f87bee7480a80aabf9cc22851b0c398" target="_blank" rel="noopener noreferrer">大会詳細ルールブックを見る</a></p>
+        </div>
+      </div>
+    </div>
+  </section>
+  </div>
+
+  <section class="next-section">
+    <div class="night" aria-hidden="true"><svg id="nightSvg" style="width:100%; height:100%; display:block;"></svg></div>
+
+    <!-- 主催代表コメント。左：コメント文／右：アイコン（.cm-icon-frame の ICON を <img src="..." alt="..."> に差し替える）。文は仮文 -->
+    <div class="comment">
+      <div class="comment-inner">
+        <div class="timetable comment-text">
+          <h2>主催代表 あいさつ</h2>
+          <p class="cm-body">左手が疼いている。だが、案ずるな。これは俺自身の都合などではない……お前たちのためだ。</p>
+          <p class="cm-body">この左手を酷使すれば、次に何が起こるか……俺にも分からん。だからこそ、二週目を選ぶ。</p>
+          <p class="cm-body">……勘違いするなよ。俺が助かるためじゃない。お前たちを無事に導くためだ。</p>
+          <p class="cm-name"><small>GranDream</small>ありが</p>
+        </div>
+        <div class="cm-icon"><div class="cm-icon-frame"><img src="images/ありが.png" alt="ありが"></div></div>
+      </div>
+    </div>
+
+    <div class="tt-scroll" id="ttScroll">
+      <div class="tt-stage" id="ttStage">
+
+        <!-- 左：項目リスト（スクロールで1つずつ選択） -->
+        <div class="timetable">
+          <h2>TIME TABLE</h2>
+          <ol class="tt-list" id="ttList">
+            <li class="tt-item"><span class="tt-dot"></span><p class="tt-label">開場</p><p class="tt-time">19:00</p></li>
+            <li class="tt-item"><span class="tt-dot"></span><p class="tt-label">予選グループ開始</p><p class="tt-time">19:30</p></li>
+            <li class="tt-item"><span class="tt-dot"></span><p class="tt-label">本戦開始</p><p class="tt-time">21:00</p></li>
+            <li class="tt-item tt-main"><span class="tt-dot"></span><p class="tt-label">決勝戦</p><p class="tt-time">23:00</p></li>
+          </ol>
+        </div>
+
+        <!-- 右：選択中の項目の内容。.tt-img の中身を <img src="..." alt=""> に差し替えると画像が入る。文は仮文 -->
+        <div class="tt-panels" id="ttPanels">
+          <article class="tt-panel">
+            <div class="tt-img"><img src="images/GranDreamCUP_title.png" alt="title"></div>
+            <p class="tt-ptime">19:00~</p>
+            <h3>開場</h3>
+            <p class="tt-text">
+              <strong>【案内】</strong> 参加チームは時間内にチェックイン<br>
+              <strong>【備考】</strong> 配信・観戦ページ同時オープン
+            </p>
+          </article>
+          <article class="tt-panel">
+            <div class="tt-img"><img src="images/Groupleague_001.png" alt="Group"></div>
+            <p class="tt-ptime">19:30~</p>
+            <h3>予選グループ開始</h3>
+            <p class="tt-text">
+              <strong>【形式】</strong> 4チーム×4グループ（ダブルエリミネーション）<br>
+              <strong>【条件】</strong> 上位2チームが本戦進出<br>
+              <strong>【ルール】</strong> BO3（2本先取）/ Loser's Map Pick形式
+            </p>
+          </article>
+          <article class="tt-panel">
+            <div class="tt-img"><img src="images/league_002.png" alt="league"></div>
+            <p class="tt-ptime">21:00~</p>
+            <h3>本戦開始</h3>
+            <p class="tt-text">
+              <strong>【形式】</strong> 本戦トーナメント（予選通過8チーム）<br>
+              <strong>【アドバンテージ】</strong> 予選1位：Upper Bracket / 予選2位：Lower Bracket<br>
+              <strong>【ルール】</strong> BO3（2本先取）/ Loser's Map Pick形式
+            </p>
+          </article>
+          <article class="tt-panel">
+            <div class="tt-img"><img src="images/GranD_FINAL_CUP_image.png" alt="GranD_FINAL"></div>
+            <p class="tt-ptime">23:00~</p>
+            <h3>決勝戦</h3>
+            <p class="tt-text">
+              <strong>【対戦】</strong> Grand Final<br>
+              <strong>【アドバンテージ】</strong> 無敗側チーム：全マップの選択権<br>
+              <strong>【ルール】</strong> BO5（3本先取）
+            </p>
+          </article>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- 使用マップ（9マップ）。.map-img の中身を <img src="..." alt="マップ名"> に差し替えると画像が入る -->
+    <div class="maps">
+      <div class="maps-inner">
+        <div class="timetable maps-head">
+          <h2>MAPS</h2>
+        </div>
+        <ul class="map-grid">
+          <li><div class="map-img"><img src=images\ナンプラー遺跡.JPG></div><p class="map-name"><span>01</span>ナンプラー遺跡</p></li>
+          <li><div class="map-img"><img src=images\ヤガラ市場.JPG></div><p class="map-name"><span>02</span>ヤガラ市場</p></li>
+          <li><div class="map-img"><img src=images\マテガイ放水路.JPG></div><p class="map-name"><span>03</span>マテガイ放水路</p></li>
+          <li><div class="map-img"><img src=images\クサヤ温泉.JPG></div><p class="map-name"><span>04</span>クサヤ温泉</p></li>
+          <li><div class="map-img"><img src=images\バイガイ亭.JPG></div><p class="map-name"><span>05</span>バイガイ亭</p></li>
+          <li><div class="map-img"><img src=images\タカアシ経済特区.JPG></div><p class="map-name"><span>06</span>タカアシ経済特区</p></li>
+          <li><div class="map-img"><img src=images\オヒョウ海運.JPG></div><p class="map-name"><span>07</span>オヒョウ海運</p></li>
+          <li><div class="map-img"><img src=images\ザトウマーケット.JPG></div><p class="map-name"><span>08</span>ザトウマーケット</p></li>
+          <li><div class="map-img"><img src=images\カジキ空港.JPG></div><p class="map-name"><span>09</span>カジキ空港</p></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="maps">
+      <div class="maps-inner">
+        <div class="timetable maps-head">
+          <h2> Loser's Map Pick形式 とは</h2>
+        </div>
+        <div>
+          <div class="tt-img">IMAGE</div>
+          <p class="cm-body" style="margin-top: 16px;">直前のマップで敗北したチームが、次のマップを選択できる形式です。
+            <br>● 1st MAP ： 全9マップから「おまかせ（ランダム）」で決定
+            <br>● 2nd MAP ： 1st MAPで敗北したチームが1st MAPで使用したマップを除く【残り8マップ】から選択
+            <br>● 3rd MAP ： 2nd MAPで敗北したチームが1st・2nd MAPで使用した2マップを除く【残り7マップ】から選択
+            </p>
+          <p class="cm-body" style="color:#7577a6;">※2勝先取（BO3）形式のため、1st・2nd MAPで決着がついた場合、3rdMAPは実施されません（1-1の場合のみ実施）</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ダブルエリミネーションの説明。.tt-img の IMAGE を <img src="..." alt="..."> に差し替える（トーナメント表などの図）。文は仮文 -->
+    <div class="maps">
+      <div class="maps-inner">
+        <div class="timetable maps-head">
+          <h2>ダブルエリミネーション とは</h2>
+        </div>
+        <div>
+          <div class="tt-img"><img src="images/esport.png" alt="esport"></div>
+          <h2 style="margin-top: 16px;">本大会はダブルエリミネーション方式を採用しています。</h2>
+          <p class="cm-body" style="margin-top: 16px;">2敗するまで敗退とならないトーナメントシステムです。
+            <br>参加者は1回負けてしまっても「ローワーブラケット」へ回ることで、そこから再び優勝を目指すチャンスが残されます。
+            <br>両ブラケットをそれぞれ勝ち上がったチーム同士が決勝戦で激突するため、
+            <br>実力が反映されやすく、ドラマチックな展開が生まれる方式として、多くのeスポーツやスポーツ大会で採用されています。
+            </p>
+          <p class="cm-body"></p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- フッター。ロゴの src・メール・SNSのURL・権利表記の文は、実際の内容に差し替える（文は仮文） -->
+  <footer class="site-footer">
+    <div class="ft-inner">
+      <div class="ft-brand">
+        <img src="images/チームロゴ.PNG" alt="GranDream">
+        <p class="ft-about">GranDream は、スプラトゥーンをメインに<br>活動するコミュニティチームです。<br>日々の配信活動やゲーム企画などを通して、<br>プレイヤー同士の交流と挑戦を楽しんでいます。</p>
+        <a class="ft-x" href="https://x.com/GranDream_info" target="_blank" rel="noopener noreferrer" aria-label="GranDream 公式X">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z"/></svg>
+          <span>@GranDream_info</span>
+        </a>
+      </div>
+      <div class="ft-cols">
+        <div class="ft-col">
+          <h3>Pages</h3>
+          <ul>
+            <li><a href="#">Top</a></li>
+            <li><a href="teams.html">参加チーム</a></li>
+            <li><a href="bracket.html">対戦表</a></li>
+            <li><a href="https://energetic-octagon-8f6.notion.site/3f87bee7480a80aabf9cc22851b0c398" target="_blank" rel="noopener noreferrer">大会詳細ルールブック</a></li>
+            <li><a href="#" target="_blank" rel="noopener noreferrer">募集フォーム</a></li>
+          </ul>
+        </div>
+        <div class="ft-col">
+          <h3>運営メンバー</h3>
+          <ul class="ft-members">
+            <li><a href="https://x.com/ariga_sin" target="_blank" rel="noopener noreferrer">ありが</a></li>
+            <li><a href="https://x.com/amamiya_iyu" target="_blank" rel="noopener noreferrer">雨宮いゆ</a></li>
+            <li><a href="https://x.com/GreatStreamer" target="_blank" rel="noopener noreferrer">DON閣下</a></li>
+            <li><a href="https://x.com/Lisuka_0928" target="_blank" rel="noopener noreferrer">りすか</a></li>
+            <li><a href="https://x.com/starlightlaser" target="_blank" rel="noopener noreferrer">いっちー</a></li>
+            <li><a href="https://x.com/koro_56_6" target="_blank" rel="noopener noreferrer">ころろ</a></li>
+            <li><a href="https://x.com/Shocker_Rin" target="_blank" rel="noopener noreferrer">たくりん</a></li>
+            <li><a href="https://x.com/Raterate_222" target="_blank" rel="noopener noreferrer">らて</a></li>
+            <li><a href="https://x.com/orca2_2snow" target="_blank" rel="noopener noreferrer">あんぺあ</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="ft-bottom">
+      <p>本大会は非公式の大会であり、ゲームの権利者とは関係ありません。ゲームに関する画像・名称の権利は、各権利者に帰属します。</p>
+      <p>&copy; 2026 GranDream 編集部</p>
+    </div>
+  </footer>
+
+  <!-- 画像の拡大表示（クリックで開く／どこかをクリック・Escで閉じる） -->
+  <div class="lightbox" id="lightbox" role="dialog" aria-modal="true" aria-label="画像の拡大表示">
+    <button type="button" aria-label="閉じる">&times;</button>
+    <img alt="">
+  </div>
+
+  <!-- 右下に3段重ねた雲のリンク（上から：対戦表／参加チーム／募集フォーム）。href を実際のURLに差し替える -->
+  <div class="cloud-stack" id="entryCloud">
+    <a class="entry-cloud" href="bracket.html">
+      <svg viewBox="0 0 220 130" aria-hidden="true">
+        <defs>
+          <linearGradient id="entry-grad-1" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="1" stop-color="#dbeafe" />
+          </linearGradient>
+        </defs>
+        <g fill="url(#entry-grad-1)">
+          <circle cx="58" cy="84" r="36" />
+          <circle cx="100" cy="58" r="44" />
+          <circle cx="146" cy="52" r="34" />
+          <circle cx="166" cy="86" r="34" />
+          <rect x="58" y="84" width="108" height="36" rx="18" />
+        </g>
+      </svg>
+      <span>対戦表</span>
+    </a>
+    <a class="entry-cloud" href="teams.html">
+      <svg viewBox="0 0 220 130" aria-hidden="true">
+        <defs>
+          <linearGradient id="entry-grad-2" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="1" stop-color="#dbeafe" />
+          </linearGradient>
+        </defs>
+        <g fill="url(#entry-grad-2)">
+          <circle cx="58" cy="84" r="36" />
+          <circle cx="100" cy="58" r="44" />
+          <circle cx="146" cy="52" r="34" />
+          <circle cx="166" cy="86" r="34" />
+          <rect x="58" y="84" width="108" height="36" rx="18" />
+        </g>
+      </svg>
+      <span>参加チーム</span>
+    </a>
+    <a class="entry-cloud" href="#" target="_blank" rel="noopener noreferrer">
+      <svg viewBox="0 0 220 130" aria-hidden="true">
+        <defs>
+          <linearGradient id="entry-grad-3" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="1" stop-color="#dbeafe" />
+          </linearGradient>
+        </defs>
+        <g fill="url(#entry-grad-3)">
+          <circle cx="58" cy="84" r="36" />
+          <circle cx="100" cy="58" r="44" />
+          <circle cx="146" cy="52" r="34" />
+          <circle cx="166" cy="86" r="34" />
+          <rect x="58" y="84" width="108" height="36" rx="18" />
+        </g>
+      </svg>
+      <span>募集フォーム</span>
+    </a>
+  </div>
+
+  <script>
+    // =====================================================================
+    // 背景色の設定：色を変えるときは、ここだけ触ればOK（#RRGGBB で指定）
+    // =====================================================================
+    const BG_COLORS = {
+      overview: '#FFFFFF', // 開催概要
+      comment:  '#C1E3FF', // 主催代表あいさつ
+      ttStart:  '#C1E3FF', // TIME TABLE：開場
+      ttMid:    '#E9EDF2', // TIME TABLE：本戦開始
+      ttEnd:    '#8D8DB0', // TIME TABLE：決勝戦（この辺りから夜空が見え始める）
+      maps:     '#5F6FB0', // MAPS
+      losers:   '#123C73', // Loser's Map Pick形式 とは
+      double:   '#123C73', // ダブルエリミネーション とは
+    };
+    const BG_BLEND   = 0.6; // セクションの境目で色が混ざる幅（大きいほどゆっくり）
+    const NIGHT_TT   = 0.25; // 夜空の濃さ：TIME TABLEの決勝戦で見え始める強さ（0〜1。大きいと文字が読みにくくなる）
+    const NIGHT_MAX  = 0.85; // 夜空の濃さ：MAPSに入ってからの最大の強さ（0〜1）
+    const SKY_LUM    = 40;   // 夜空の明るさの目安（文字を白くするかの判定用）
+    const DARK_BELOW = 128; // 背景の明るさがこれ未満なら、MAPS以降の文字を白系にする（0〜255）
+    const hex = (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16)); // '#RRGGBB' → [R,G,B]
+    // =====================================================================
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    // ---- 星空の生成（約6割の星が瞬く） ----
+    const starSvg = document.getElementById('starSvg');
+    const starColors = ['#ffffff', '#fef08a', '#fbcfe8', '#bae6fd', '#38bdf8', '#f472b6'];
+
+    function createStars(svg = starSvg, starCount = 90) {
+      for (let i = 0; i < starCount; i++) {
+        const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+        const opacity = Math.random() * 0.7 + 0.3;
+        c.setAttribute('cx', `${Math.random() * 100}%`);
+        c.setAttribute('cy', `${Math.random() * 100}%`);
+        c.setAttribute('r', Math.random() * 2.0 + 0.8);
+        c.setAttribute('fill', starColors[Math.floor(Math.random() * starColors.length)]);
+        c.setAttribute('opacity', opacity);
+        c.classList.add('star');
+        if (Math.random() < 0.6) {
+          c.classList.add('twinkle');
+          c.style.setProperty('--o', opacity);
+          c.style.setProperty('--d', `${(2 + Math.random() * 4).toFixed(2)}s`);
+          c.style.setProperty('--delay', `-${(Math.random() * 6).toFixed(2)}s`);
+        }
+        svg.appendChild(c);
+      }
+    }
+    createStars();
+    createStars(document.getElementById('nightSvg'), 70); // 下の夜空の星
+
+    // ---- 流れ星（2.5〜6秒おきにランダム発生、画面外では出さない） ----
+    const hero = document.getElementById('hero');
+    const shootingLayer = document.getElementById('shootingLayer');
+
+    function spawnShootingStar() {
+      if (window.scrollY < window.innerHeight * 0.8) {
+        const s = document.createElement('div');
+        s.className = 'shooting-star';
+        s.style.left = `${10 + Math.random() * 70}%`;
+        s.style.top = `${Math.random() * 40}%`;
+        s.style.setProperty('--angle', `${20 + Math.random() * 20}deg`);
+        s.style.setProperty('--dist', `${260 + Math.random() * 200}px`);
+        shootingLayer.appendChild(s);
+        s.addEventListener('animationend', () => s.remove());
+      }
+      setTimeout(spawnShootingStar, 2500 + Math.random() * 3500);
+    }
+    if (!reduceMotion) setTimeout(spawnShootingStar, 1500);
+
+    // ---- 雲の歪み防止：縦長の画面では引き伸ばさず、中央を拡大して表示 ----
+    const cloudSvgs = document.querySelectorAll('.clouds-svg');
+    function fitClouds() {
+      cloudSvgs.forEach(svg => {
+        const ratio = svg.clientWidth / svg.clientHeight;
+        // viewBox(1000x300)の比率3.33より縦長なら slice、横長なら none（全幅に広げる）
+        svg.setAttribute('preserveAspectRatio', ratio < 3.3 ? 'xMidYMax slice' : 'none');
+      });
+    }
+    fitClouds();
+    window.addEventListener('resize', () => { fitClouds(); ttIndex = -1; update(); });
+
+    // ---- パララックス制御（rAFで間引き） ----
+    const heroScroll = document.getElementById('heroScroll');
+    const cloudBack = document.getElementById('cloudBack');
+    const cloudFront = document.getElementById('cloudFront');
+    let ticking = false;
+
+    // 背景色の「使い方」。色そのものは、<script> の先頭の BG_COLORS で変更する
+    const mapsEls = document.querySelectorAll('.maps');
+    const entryCloud = document.getElementById('entryCloud');
+    const siteFooter = document.querySelector('.site-footer');
+    const BG_STOPS = [
+      { rgb: hex(BG_COLORS.overview) },                                          // 開催概要
+      { el: document.querySelector('.comment'),  rgb: hex(BG_COLORS.comment) },  // 主催代表あいさつ
+      { el: document.getElementById('ttScroll'), rgb: hex(BG_COLORS.ttStart) },  // TIME TABLE（実際の色は下の TT_* で変化）
+      { el: mapsEls[0],                          rgb: hex(BG_COLORS.maps) },     // MAPS
+      { el: mapsEls[1],                          rgb: hex(BG_COLORS.losers) },   // Loser's Map Pick形式 とは
+      { el: mapsEls[2],                          rgb: hex(BG_COLORS.double) },   // ダブルエリミネーション とは
+    ];
+    const TT_FROM = hex(BG_COLORS.ttStart); // 開場
+    const TT_MID  = hex(BG_COLORS.ttMid);   // 本戦開始
+    const TT_TO   = hex(BG_COLORS.ttEnd);   // 決勝戦
+    function updateBg(h) {
+      // TIME TABLEの固定中：項目の進み具合に合わせて 開場 → 本戦開始 → 決勝戦 の色へ柔らかく変化
+      const ttRange = ttScroll.offsetHeight - ttStage.offsetHeight;
+      const ttPx = Math.min(ttRange, Math.max(0, -ttScroll.getBoundingClientRect().top));
+      const pos = ttPx / (ttRange / ttItems.length); // 0〜4：選択中の項目の位置（項目iの中心 = i+0.5）
+      const cl = (x) => Math.min(1, Math.max(0, x));
+      const lerp = (a, b, t) => a.map((v, i) => v + (b[i] - v) * t);
+      const ttRgb = pos <= 2.5 ? lerp(TT_FROM, TT_MID, cl((pos - 0.5) / 2))  // 開場 → 本戦開始
+                                : lerp(TT_MID, TT_TO, cl(pos - 2.5));        // 本戦開始 → 決勝戦
+      const ref = window.scrollY + h * 0.5, W = h * BG_BLEND; // 画面の中央が境目を越えるあたりで切り替わる
+      let c = BG_STOPS[0].rgb;
+      let uMaps = 0; // MAPSへの切り替わりの進み具合（0〜1）
+      for (let i = 1; i < BG_STOPS.length; i++) {
+        const top = BG_STOPS[i].el.getBoundingClientRect().top + window.scrollY;
+        const u = Math.min(1, Math.max(0, (ref - (top - W / 2)) / W));
+        if (i === 3) uMaps = u;
+        const to = (i === 2) ? ttRgb : BG_STOPS[i].rgb; // i=2 が TIME TABLE
+        c = c.map((v, j) => v + (to[j] - v) * u);
+      }
+      document.documentElement.style.setProperty('--bg', `rgb(${c.map(Math.round).join(',')})`);
+      // ★追加：背景が暗いとき（明るさ128未満）は文字を白系に切り替える
+      // 夜空：決勝戦で薄く見え始め（NIGHT_TT）、MAPSに入るにつれて NIGHT_MAX まで濃くなる
+      const sky = Math.max(cl(pos - 3) * NIGHT_TT, uMaps * NIGHT_MAX);
+      document.documentElement.style.setProperty('--stars', sky.toFixed(3));
+      // 文字を白くするかは、夜空を重ねた後の見た目の明るさで判定する
+      const lum = 0.299 * c[0] + 0.587 * c[1] + 0.114 * c[2];
+      const isDark = lum * (1 - sky) + SKY_LUM * sky < DARK_BELOW;
+      mapsEls.forEach(el => el.classList.toggle('dark', isDark)); // MAPS／Loser's だけに適用
+    }
+
+    // タイムテーブル：固定中のスクロール量で項目を1つずつ選択（選択式）
+    const ttScroll = document.getElementById('ttScroll');
+    const ttStage  = document.getElementById('ttStage');
+    const ttList   = document.getElementById('ttList');
+    const ttItems  = [...ttList.querySelectorAll('.tt-item')];
+    const ttPanels = [...document.querySelectorAll('.tt-panel')];
+    let ttIndex = -1;
+
+    function updateTimetable() {
+      const range = ttScroll.offsetHeight - ttStage.offsetHeight;
+      const px = Math.min(range, Math.max(0, -ttScroll.getBoundingClientRect().top));
+      const idx = Math.min(ttItems.length - 1, Math.floor(px / (range / ttItems.length)));
+      if (idx === ttIndex) return;
+      ttIndex = idx;
+      ttItems.forEach((li, i) => {
+        li.classList.toggle('active', i === idx);
+        li.classList.toggle('past', i < idx);
+        ttPanels[i].classList.toggle('active', i === idx);
+      });
+      // 線は選択中の点まで伸ばす
+      const dot = ttItems[idx].querySelector('.tt-dot');
+      ttList.style.setProperty('--fill', ((ttItems[idx].offsetTop + dot.offsetTop + dot.offsetHeight / 2) / ttList.offsetHeight).toFixed(4));
+    }
+    // 項目をクリックすると、その項目が選択される位置までスクロール
+    ttItems.forEach((li, i) => li.addEventListener('click', () => {
+      const range = ttScroll.offsetHeight - ttStage.offsetHeight;
+      const top = window.scrollY + ttScroll.getBoundingClientRect().top + (i + 0.5) * (range / ttItems.length);
+      window.scrollTo({ top, behavior: 'smooth' });
+    }));
+
+    function update() {
+      const h = window.innerHeight;
+      const range = heroScroll.offsetHeight - hero.offsetHeight; // 固定されている間のスクロール距離
+      const p = Math.min(1, Math.max(0, -heroScroll.getBoundingClientRect().top / range));
+      const q = Math.min(1, p / 0.7); // 前半70%で雲が上がり切り、残りは開催概要を読む時間
+      // 手前の雲：谷の部分が画面上端を越える位置まで上げる（雲の高さから算出）
+      const frontTravel = h * 1.02 - cloudFront.offsetHeight * 0.32;
+      cloudFront.style.transform = `translate3d(0, ${-q * frontTravel}px, 0)`;
+      cloudBack.style.transform  = `translate3d(0, ${-q * frontTravel * 0.6}px, 0)`; // 奥：ゆっくり
+      updateBg(h);
+      // 開催概要が見え始めたら（雲が上がり始めて p が ENTRY_SHOW を超えたら）、右下の雲リンクを表示（以降、最後まで）
+      // フッターが画面の下から75%の位置まで来たら隠す（フッターのリンクに重ならないように）。隠したくなければ && 以降を消す
+      entryCloud.classList.toggle('show', p > 0.35 && siteFooter.getBoundingClientRect().top > h * 0.75); // 0.35 を小さくすると早く表示される
+      updateTimetable();
+      ticking = false;
+    }
+    window.addEventListener('scroll', () => {
+      if (!ticking) { requestAnimationFrame(update); ticking = true; }
+    }, { passive: true });
+    update();
+
+    // ---- 画像の拡大表示（ライトボックス）----
+    const lb = document.getElementById('lightbox');
+    const lbImg = lb.querySelector('img');
+    document.addEventListener('click', (e) => {
+      const img = e.target.closest('.tt-img img, .map-img img'); // 拡大する対象。増やすときはここに追加
+      if (!img) return;
+      lbImg.src = img.currentSrc || img.src;
+      lbImg.alt = img.alt;
+      lb.classList.add('open');
+    });
+    lb.addEventListener('click', () => lb.classList.remove('open'));
+    document.addEventListener('keydown', (e) => { if (e.key === 'Escape') lb.classList.remove('open'); });
+    ['wheel', 'touchmove'].forEach(t => lb.addEventListener(t, (e) => e.preventDefault(), { passive: false })); // 表示中は後ろをスクロールさせない
+  </script>
+
+</body>
+</html>
