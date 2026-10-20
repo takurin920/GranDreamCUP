@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>対戦表 | GraDre杯</title>
+<title>対戦表 | GraDreCUP</title>
 <style>
   :root { --ink:#e8f0ff; --mute:#aab9d8; --line:rgba(190,215,255,.28); --mint:#c7eded; --pink:#f9b4d4; --lav:#cdbdff; --gold:#ffe2a8; }
   * { margin:0; padding:0; box-sizing:border-box; }
@@ -138,8 +138,8 @@
   .grp > h3 { color:rgb(var(--tint)); margin-bottom:16px; }
   .bracket { margin-top:32px; }
   .scroll { overflow-x:auto; padding-bottom:6px; }  /* 横長の図は、カードの中で横にスクロール */
-  .fb { --cw:160px; --gap:40px; --sh:40px; --gg:36px; --rm:40px; --gm:calc(2 * var(--sh) + 8px); --gh:calc(2 * var(--gm) + var(--gg));
-        display:grid; grid-template-columns:repeat(5,var(--cw)); column-gap:var(--gap); min-width:max-content; }
+  .fb { --cw:160px; --gap:36px; --sh:40px; --gg:36px; --rm:40px; --gm:calc(2 * var(--sh) + 8px); --gh:calc(2 * var(--gm) + var(--gg));
+        position:relative; padding-left:44px; display:grid; grid-template-columns:repeat(5,var(--cw)); column-gap:var(--gap); min-width:max-content; }
   .t4 { grid-area:1/4; } .t5 { grid-area:1/5; }
   .u1 { grid-area:2/1; } .uf { grid-area:2/3; } .gf { grid-area:2/5; }
   .l1 { grid-area:3/1; } .l3 { grid-area:3/2; } .l5 { grid-area:3/3; } .l6 { grid-area:3/4; }
@@ -158,6 +158,12 @@
   .uf .sl::after { width:calc(var(--cw) + 2 * var(--gap)); }
   .l5 .sl::after { width:var(--gap); }
   .l6 .sl::after { content:''; position:absolute; left:100%; bottom:50%; width:calc(var(--gap) + var(--cw) / 2); height:calc(var(--gh) + var(--rm) - var(--gm) / 2); border-right:1px solid var(--line); border-bottom:1px solid var(--line); } /* 決勝戦へ上がる線 */
+  /* アッパー／ローワーブラケットのくくり（左の括弧と縦書きの名前） */
+  .fb .tm { line-height:26px; margin-bottom:26px; }   /* 見出しの高さを固定（括弧の位置合わせのため） */
+  .br { position:absolute; left:22px; width:10px; height:calc(var(--gh) + 4px); border:1.5px solid rgba(var(--tint),.75); border-right:0; border-radius:8px 0 0 8px; }
+  .br-u { top:50px; }
+  .br-l { top:calc(52px + var(--gh) + var(--rm) - 2px); }
+  .br span { position:absolute; right:calc(100% + 6px); top:50%; transform:translateY(-50%); writing-mode:vertical-rl; letter-spacing:.18em; font-size:.8rem; white-space:nowrap; color:rgb(var(--tint)); }
   .gf .slot { border-color:var(--gold); }
   .gf .gl { color:var(--gold); }
 
@@ -190,7 +196,7 @@
     <p class="lead">16チームが4つのグループに分かれ、ダブルエリミネーションで戦います。<br>全試合BO3で、各グループの上位2チームが本戦へ進みます。</p>
     <div class="groups">
       <details class="card grp g-red">
-        <summary><h3>グループA</h3></summary>
+        <summary><h3>ベテルギウス</h3></summary>
         <div class="scroll"><div class="gb">
           <h4 class="tm t1">19:30~</h4><h4 class="tm t2">20:00~</h4><h4 class="tm t3">20:30~</h4>
           <div class="g1"><div class="gm " data-match="GA_Match1"><p class="gl">Match1</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>A-1</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>A-2</b>チーム名</span><i class="pt"></i></div></div></div><div class="gm " data-match="GA_Match2"><p class="gl">Match2</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>A-3</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>A-4</b>チーム名</span><i class="pt"></i></div></div></div></div>
@@ -202,7 +208,7 @@
         <p class="adv">#1（Match3の勝者）と#2（Match5の勝者）が本戦へ進みます。</p>
       </details>
       <details class="card grp g-blue">
-        <summary><h3>グループB</h3></summary>
+        <summary><h3>シリウス</h3></summary>
         <div class="scroll"><div class="gb">
           <h4 class="tm t1">19:30~</h4><h4 class="tm t2">20:00~</h4><h4 class="tm t3">20:30~</h4>
           <div class="g1"><div class="gm " data-match="GB_Match1"><p class="gl">Match1</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>B-1</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>B-2</b>チーム名</span><i class="pt"></i></div></div></div><div class="gm " data-match="GB_Match2"><p class="gl">Match2</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>B-3</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>B-4</b>チーム名</span><i class="pt"></i></div></div></div></div>
@@ -214,7 +220,7 @@
         <p class="adv">#1（Match3の勝者）と#2（Match5の勝者）が本戦へ進みます。</p>
       </details>
       <details class="card grp g-yellow">
-        <summary><h3>グループC</h3></summary>
+        <summary><h3>プロキオン</h3></summary>
         <div class="scroll"><div class="gb">
           <h4 class="tm t1">19:30~</h4><h4 class="tm t2">20:00~</h4><h4 class="tm t3">20:30~</h4>
           <div class="g1"><div class="gm " data-match="GC_Match1"><p class="gl">Match1</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>C-1</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>C-2</b>チーム名</span><i class="pt"></i></div></div></div><div class="gm " data-match="GC_Match2"><p class="gl">Match2</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>C-3</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>C-4</b>チーム名</span><i class="pt"></i></div></div></div></div>
@@ -226,7 +232,7 @@
         <p class="adv">#1（Match3の勝者）と#2（Match5の勝者）が本戦へ進みます。</p>
       </details>
       <details class="card grp g-purple">
-        <summary><h3>グループD</h3></summary>
+        <summary><h3>ポラリス</h3></summary>
         <div class="scroll"><div class="gb">
           <h4 class="tm t1">19:30~</h4><h4 class="tm t2">20:00~</h4><h4 class="tm t3">20:30~</h4>
           <div class="g1"><div class="gm " data-match="GD_Match1"><p class="gl">Match1</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>D-1</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>D-2</b>チーム名</span><i class="pt"></i></div></div></div><div class="gm " data-match="GD_Match2"><p class="gl">Match2</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><b>D-3</b>チーム名</span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><b>D-4</b>チーム名</span><i class="pt"></i></div></div></div></div>
@@ -247,15 +253,17 @@
       <article class="card grp g-green">
         <h3>本戦トーナメント</h3>
         <div class="scroll"><div class="fb">
+          <div class="br br-u" aria-hidden="true"><span>アッパーブラケット</span></div>
+          <div class="br br-l" aria-hidden="true"><span>ローワーブラケット</span></div>
           <h4 class="tm t1">21:00~</h4><h4 class="tm t2">21:30~</h4><h4 class="tm t3">22:00~</h4><h4 class="tm t4">22:30~</h4><h4 class="tm t5">23:00~</h4>
-          <div class="gbk u1" style="--ext:calc(var(--gap) / 2 + var(--cw) + var(--gap))"><div class="gm " data-match="F_Match6"><p class="gl">Match6</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">グループA #1</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">グループB #1</span></span><i class="pt"></i></div></div></div><div class="gm " data-match="F_Match7"><p class="gl">Match7</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">グループC #1</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">グループD #1</span></span><i class="pt"></i></div></div></div></div>
-          <div class="gm uf" data-match="F_Match12"><p class="gl">Match12</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match6の勝者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match7の勝者</span></span><i class="pt"></i></div></div></div>
-          <div class="gm gf" data-match="F_GrandFinal" data-win="3"><p class="gl">決勝戦 GrandFinal</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match12の勝者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match14の勝者</span></span><i class="pt"></i></div></div></div>
-          <div class="gp l1"><div class="gm " data-match="F_Match8"><p class="gl">Match8</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">グループA #2</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">グループB #2</span></span><i class="pt"></i></div></div></div><div class="gm " data-match="F_Match9"><p class="gl">Match9</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">グループC #2</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">グループD #2</span></span><i class="pt"></i></div></div></div>
+          <div class="gbk u1" style="--ext:calc(var(--gap) / 2 + var(--cw) + var(--gap))"><div class="gm " data-match="Match6"><p class="gl">Match6</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">ベテルギウス #1</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">シリウス　　 #1</span></span><i class="pt"></i></div></div></div><div class="gm " data-match="Match7"><p class="gl">Match7</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">プロキオン　 #1</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">ポラリス　　 #1</span></span><i class="pt"></i></div></div></div></div>
+          <div class="gm uf" data-match="Match12"><p class="gl">Match12</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match6の勝者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match7の勝者</span></span><i class="pt"></i></div></div></div>
+          <div class="gm gf" data-match="Match15" data-win="3"><p class="gl">決勝戦 GrandFinal</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match12の勝者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match14の勝者</span></span><i class="pt"></i></div></div></div>
+          <div class="gp l1"><div class="gm " data-match="Match8"><p class="gl">Match8</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">ベテルギウス #2</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">シリウス　　 #2</span></span><i class="pt"></i></div></div></div><div class="gm " data-match="Match9"><p class="gl">Match9</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">プロキオン　 #2</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">ポラリス　　 #2</span></span><i class="pt"></i></div></div></div>
             <svg class="xc" viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true"><line x1="0" y1="20.8" x2="100" y2="79.2"/><line x1="0" y1="79.2" x2="100" y2="20.8"/></svg></div>
-          <div class="gbk l3"><div class="gm " data-match="F_Match10"><p class="gl">Match10</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match6の敗者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match9の勝者</span></span><i class="pt"></i></div></div></div><div class="gm " data-match="F_Match11"><p class="gl">Match11</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match7の敗者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match8の勝者</span></span><i class="pt"></i></div></div></div></div>
-          <div class="gm l5" data-match="F_Match13"><p class="gl">Match13</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match10の勝者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match11の勝者</span></span><i class="pt"></i></div></div></div>
-          <div class="gm l6" data-match="F_Match14"><p class="gl">Match14</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match12の敗者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match13の勝者</span></span><i class="pt"></i></div></div></div>
+          <div class="gbk l3"><div class="gm " data-match="Match10"><p class="gl">Match10</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match6の敗者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match9の勝者</span></span><i class="pt"></i></div></div></div><div class="gm " data-match="Match11"><p class="gl">Match11</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match7の敗者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match8の勝者</span></span><i class="pt"></i></div></div></div></div>
+          <div class="gm l5" data-match="Match13"><p class="gl">Match13</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match10の勝者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match11の勝者</span></span><i class="pt"></i></div></div></div>
+          <div class="gm l6" data-match="Match14"><p class="gl">Match14</p><div class="sl"><div class="slot" data-side="A"><span class="nm"><span class="rule">Match12の敗者</span></span><i class="pt"></i></div><div class="slot" data-side="B"><span class="nm"><span class="rule">Match13の勝者</span></span><i class="pt"></i></div></div></div>
         </div></div>
         <p class="adv">ローワーブラケットは、アッパーブラケットから落ちてきたチームと対戦します。</p>
       </article>
@@ -272,7 +280,7 @@
   const REFRESH_MS = 10000; // 自動更新の間隔（ミリ秒）。30000 = 30秒
   const WIN_SCORE  = 2;     // 何本先取で勝ちか（BO3 なら 2）。決勝戦だけは HTML の data-win="3"（BO5）で上書き
 
-  // 未確定を表す文字列（空、または GA_Match1_winner / F_Match6_loser のような仮の文字）は「まだ決まっていない」として扱う
+  // 未確定を表す文字列（空、または GA_Match1_winner / Match6_loser のような仮の文字）は「まだ決まっていない」として扱う
   const isUndecided = (n) => !n || /_(winner|loser)$/i.test(String(n).trim());
   const clean = (n) => (isUndecided(n) ? '' : String(n).trim());
   const toNum = (v) => (v === '' || v == null || isNaN(Number(v)) ? null : Number(v));
